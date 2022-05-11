@@ -1,4 +1,5 @@
 import pygame
+from magic import MagicPlayer
 from settings import *
 from tile import Tile
 from player import Player
@@ -9,6 +10,7 @@ from weapon import Weapon
 from ui import UI
 from enemy import Enemy
 from particles import AnimationPlayer
+from magic import MagicPlayer
 
 class Level:
   def __init__(self):
@@ -38,6 +40,7 @@ class Level:
 
     # particles
     self.animation_player = AnimationPlayer()
+    self.magic_player = MagicPlayer(self.animation_player)
 
   def create_map(self): # settings.py의 WORLD_MAP을 볼러옴
     layouts = {  # 순수 문자열 리스트 집합으로 만들어진 맵 정보
@@ -103,9 +106,11 @@ class Level:
     self.current_attack = Weapon(self.player, [self.visible_sprites, self.attack_sprites])  # self.current_attack 변수에 Weapon 객체를 생성
 
   def create_magic(self, style, strength, cost):
-    print(style)
-    print(strength)
-    print(cost)
+    if style == 'heal':
+      self.magic_player.heal(self.player, strength, cost, [self.visible_sprites])
+    
+    if style == 'flame':
+      self.magic_player.flame(self.player, cost, [self.visible_sprites, self.attack_sprites])
 
   def destroy_attack(self):       # 생성한 무기 삭제 함수
     if self.current_attack:       # 생성한 무기 객체가 존재한다면 True

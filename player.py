@@ -188,9 +188,21 @@ class Player(Entity):  # pygame의 sprite.Sprite를 상속받아 클래스 생�
     weapon_damage = weapon_data[self.weapon]['damage']
     return base_damage + weapon_damage
 
+  def get_full_magic_damage(self):
+    base_damage = self.stats['magic']
+    spell_damage = magic_data[self.magic]['strength']
+    return base_damage + spell_damage
+
+  def energy_recovery(self):
+    if self.energy < self.stats['energy']:
+      self.energy += 0.01 * self.stats['magic']
+    else:
+      self.energy = self.stats['energy']
+
   def update(self): # update라는 이름의 함수는 만든것이 아닌 자체 지정된 api 함수. 자동적으로 디스플레이 업데이트가 되면서 이 함수도 같이 실행됨.
     self.input()  # FPS 초당 60번 반복하며 사용자의 입력을 받음.
     self.cooldowns()
     self.get_status()
     self.animate()
     self.move(self.speed)  # 입력받은대로 플레이어 스프라이트를 움직임.
+    self.energy_recovery()
