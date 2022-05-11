@@ -4,10 +4,11 @@ from tile import Tile
 from player import Player
 from debug import debug
 from support import *
-from random import choice
+from random import choice, randint
 from weapon import Weapon
 from ui import UI
 from enemy import Enemy
+from particles import AnimationPlayer
 
 class Level:
   def __init__(self):
@@ -26,12 +27,17 @@ class Level:
 
     # attack sprites
     self.current_attack = None
+    self.attack_sprites = pygame.sprite.Group()
+    self.attackable_sprites = pygame.sprite.Group()
 
     # sprite setup
     self.create_map()  # 아래 함수를 실행
 
     # user interface
     self.ui = UI()
+
+    # particles
+    self.animation_player = AnimationPlayer()
 
   def create_map(self): # settings.py의 WORLD_MAP을 볼러옴
     layouts = {  # 순수 문자열 리스트 집합으로 만들어진 맵 정보
@@ -56,7 +62,11 @@ class Level:
               Tile((x,y), [self.obstacle_sprites], 'invisible') # boundary. 움직임을 막는 경계선은 보이면 안되므로 obstacle_sprites만 적용 타일 생성
             if style == 'grass':
               random_grass_image = choice(graphics['grass'])  # random 모듈 내 choice함수를 사용하여 graphics/grass 폴더 안 스프라이트를 랜덤으로 지정 후 타일 생성
-              Tile((x,y), [self.visible_sprites, self.obstacle_sprites], 'grass', random_grass_image)
+              Tile(
+                (x,y),
+                [self.visible_sprites, self.obstacle_sprites, self.attackable_sprites], 
+                'grass', 
+                random_grass_image)
             if style == 'object':
               surf = graphics['objects'][int(col)]  # 자동적으로 128x128인 스프라이트는 TILESIZE가 128인 surf로 생성됨
               Tile((x,y), [self.visible_sprites, self.obstacle_sprites], 'object', surf)        
@@ -75,8 +85,13 @@ class Level:
                 elif col == '391': monster_name = 'spirit'
                 elif col == '392': monster_name = 'raccoon'
                 else: monster_name = 'squid'
-                Enemy(monster_name, (x, y), [self.visible_sprites], self.obstacle_sprites)
-           
+                Enemy(
+                  monster_name,
+                  (x, y), 
+                  [self.visible_sprites, self.attackable_sprites], 
+                  self.obstacle_sprites,
+                  self.damage_player,
+                  self.trigger_death_particles)
             ## -1인 곳을 제외한 나머지 스프라이트 위치에 각 style을 비교 후 일치하는 타일에 객체를 생성하여 타일을 보여주도록 한다.
 
     #     if col == 'x': # 장애물
@@ -85,7 +100,7 @@ class Level:
     #       self.player = Player((x, y), [self.visible_sprites], self.obstacle_sprites) # 위치와 어떤 그룹에 속하는지 지정 객체 생성
 
   def create_attack(self):
-    self.current_attack = Weapon(self.player, [self.visible_sprites])  # self.current_attack 변수에 Weapon 객체를 생성
+    self.current_attack = Weapon(self.player, [self.visible_sprites, self.attack_sprites])  # self.current_attack 변수에 Weapon 객체를 생성
 
   def create_magic(self, style, strength, cost):
     print(style)
@@ -97,6 +112,32 @@ class Level:
       self.current_attack.kill()
     self.current_attack = None
 
+  def player_attack_logic(self):
+    if self.attack_sprites:
+      for attack_sprite in self.attack_sprites:
+        # attackable_sprites의 스프라이트들이 Weapon인 attack_sprite와 겹칠경우 모든 스프라이트를 리스트로 반환한다.
+        collision_sprites = pygame.sprite.spritecollide(attack_sprite, self.attackable_sprites, False) # True일 경우 반환된 모든 스프라이트를 해당 그룹에서 삭제함.
+        if collision_sprites:
+          for target_sprite in collision_sprites:
+            if target_sprite.sprite_type == 'grass': # grass만 떄렸을 경우 바로 사라지게 만든다
+              pos = target_sprite.rect.center
+              offset = pygame.math.Vector2(0, 75)
+              for leaf in range(randint(3, 6)):
+                self.animation_player.create_grass_particles(pos - offset, [self.visible_sprites])
+              target_sprite.kill()
+            else:
+              target_sprite.get_damage(self.player, attack_sprite.sprite_type)
+            
+  def damage_player(self, amount, attack_type):
+    if self.player.vulnerable:
+      self.player.health -= amount
+      self.player.vulnerable = False
+      self.player.hurt_time = pygame.time.get_ticks()
+      self.animation_player.create_particles(attack_type, self.player.rect.center, [self.visible_sprites])
+
+  def trigger_death_particles(self, pos, particle_type):
+    self.animation_player.create_particles(particle_type, pos, self.visible_sprites)
+
   def run(self): # 초당 60FPS 반복되는 level.py의 run 함수
 
     # update and draw the game
@@ -104,6 +145,7 @@ class Level:
           # visible스프라이트를 모두 화면에 그리기
     self.visible_sprites.update()
     self.visible_sprites.enemy_update(self.player)
+    self.player_attack_logic()
     self.ui.display(self.player)
 
 class YSortCameraGroup(pygame.sprite.Group):  # 플레이어 카메라 클래스

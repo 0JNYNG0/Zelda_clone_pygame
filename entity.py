@@ -1,4 +1,5 @@
 import pygame
+from math import sin
 
 class Entity(pygame.sprite.Sprite):  # Player와 Enemy의 중복을 최소화하기위해 통틀어서 관리하는 Entity 클래스이다
   def __init__(self, groups):
@@ -36,3 +37,10 @@ class Entity(pygame.sprite.Sprite):  # Player와 Enemy의 중복을 최소화하
             self.hitbox.bottom = sprite.hitbox.top
           if self.direction.y < 0: # moving up
             self.hitbox.top = sprite.hitbox.bottom
+
+  def wave_value(self):
+    value = sin(pygame.time.get_ticks())
+    if value >= 0: 
+      return 255
+    else: 
+      return 0

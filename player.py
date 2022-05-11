@@ -37,11 +37,16 @@ class Player(Entity):  # pygame의 sprite.Sprite를 상속받아 클래스 생�
     self.magic_switch_time = None
 
     # stats
-    self.stats = {'health': 100, 'energy': 60, 'magic': 4, 'speed': 5}
+    self.stats = {'health': 100, 'energy': 60, 'attack': 10, 'magic': 4, 'speed': 5}
     self.health = self.stats['health'] * 0.5
     self.energy = self.stats['energy'] * 0.8
     self.exp = 123
     self.speed = self.stats['speed']
+
+    # damage timer
+    self.vulnerable = True
+    self.hurt_time = None
+    self.invulnerability_duration = 500
 
   def import_player_assets(self):
     character_path = './graphics/player/'  # 애니메이션의 full_path를 만들어주기 위한 경로의 앞 부분
@@ -143,7 +148,7 @@ class Player(Entity):  # pygame의 sprite.Sprite를 상속받아 클래스 생�
     current_time = pygame.time.get_ticks()
 
     if self.attacking:
-      if current_time - self.attack_time >= self.attack_cooldown: # 공격하고 난 뒤 지난 시간이 쿨타임 시간보다 많거나 같아질 경우 다시 공격 가능
+      if current_time - self.attack_time >= self.attack_cooldown + weapon_data[self.weapon]['cooldown']: # 공격하고 난 뒤 지난 시간이 쿨타임 시간보다 많거나 같아질 경우 다시 공격 가능
         self.attacking = False
         self.destroy_attack()  # 무기 삭제 함수 실행
 
@@ -154,6 +159,10 @@ class Player(Entity):  # pygame의 sprite.Sprite를 상속받아 클래스 생�
     if not self.can_switch_magic:
       if current_time - self.magic_switch_time >= self.switch_duration_cooldown:
         self.can_switch_magic = True   # 쿨타임이 끝나면 다시 마법 교체가 가능
+
+    if not self.vulnerable:
+      if current_time - self.hurt_time >= self.invulnerability_duration:
+        self.vulnerable = True
 
   def animate(self):
     animation = self.animations[self.status] # 초기화해둔 애니메이션을 토대로 현재 status에 맞는 animation을 불러오게됨
@@ -166,6 +175,18 @@ class Player(Entity):  # pygame의 sprite.Sprite를 상속받아 클래스 생�
     # set the image
     self.image = animation[int(self.frame_index)]
     self.rect = self.image.get_rect(center = self.hitbox.center)
+
+    # flicker
+    if not self.vulnerable:
+      alpha = self.wave_value()
+      self.image.set_alpha(alpha)
+    else:
+      self.image.set_alpha(255)
+
+  def get_full_weapon_damage(self):
+    base_damage = self.stats['attack']
+    weapon_damage = weapon_data[self.weapon]['damage']
+    return base_damage + weapon_damage
 
   def update(self): # update라는 이름의 함수는 만든것이 아닌 자체 지정된 api 함수. 자동적으로 디스플레이 업데이트가 되면서 이 함수도 같이 실행됨.
     self.input()  # FPS 초당 60번 반복하며 사용자의 입력을 받음.
